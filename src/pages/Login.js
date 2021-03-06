@@ -19,7 +19,7 @@ const Login = () => {
     }, [])
 
     return (
-        <div>
+        <div className=''>
             <p>Login details page</p>
         </div>
     )
