@@ -1,36 +1,68 @@
 import React, {useContext, useEffect, useState} from 'react';
 import {Link, useHistory} from 'react-router-dom';
 import FirebaseContext from '../context/FirebaseContext';
+import {doesUserNameExist} from '../srevices/firebase';
 import * as ROUTES from '../constants/routes';
 
-const Login = () => {
+const SignUp = () => {
   const history = useHistory();
   const {firebase} = useContext(FirebaseContext);
 
+  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const [error, setError] = useState('');
   const isInValid = password === '' || email === '';
 
-  const handleSubmit = async (event) => {
+  // Signup function
+  const handleSignUp = async (event) => {
     event.preventDefault();
     console.log('Submit button clicked');
 
-    try {
-      await firebase.auth().signInWithEmailAndPassword(email, password);
-      console.log('Login Success!');
-      history.push(ROUTES.DASHBOARD);
-    } catch (err) {
-      setEmail('');
-      setPassword('');
-      setError(err.message);
+    const userNameExists = await doesUserNameExist(username);
+    if (!userNameExists.length) {
+      try {
+        const newCreatedUser = await firebase
+          .auth()
+          .createUserWithEmailAndPassword(email, password);
+
+        // Update profile display name
+        await newCreatedUser.user.updateProfile({
+          displayName: username,
+        });
+
+        // Firestore document update
+        await firebase.firestore().collection('users').add({
+          userId: newCreatedUser.user.uid,
+          username: username.toLowerCase(),
+          fullName,
+          emailAddress: newCreatedUser.user.email,
+          following: [],
+          followers: [],
+          dateCreated: Date.now(),
+        });
+
+        history.push(ROUTES.DASHBOARD);
+      } catch (err) {
+        setFullName('');
+        setUsername('');
+        setEmail('');
+        setPassword('');
+        setError(err.message);
+      }
+    } else {
+      setUsername('');
+      setError('That username has already been taken, Please try another.');
     }
   };
 
   // uses for updating page title`
   useEffect(() => {
-    document.title = 'Login - Instagram';
+    document.title = 'SignUp - Instagram';
+    setEmail('');
+    setPassword('');
   }, []);
 
   return (
@@ -52,7 +84,30 @@ const Login = () => {
             <p className="text-sm text-red-400 font-normal p-4">{error}</p>
           )}
 
-          <form onSubmit={handleSubmit} method="POST">
+          <form onSubmit={handleSignUp} method="POST">
+            {/* UserName field */}
+            <input
+              aria-label="Username"
+              type="text"
+              className=" text-sm text-gray-base mr-3 py-5 px-4 h-2 mb-2 w-full border border-dark-400 rounded-sm"
+              placeholder="User name"
+              // eslint-disable-next-line arrow-body-style
+              onChange={({target}) => setUsername(target.value)}
+              value={username}
+            />
+
+            {/* Fullname Field */}
+
+            <input
+              aria-label="Full Name"
+              type="text"
+              className="text-sm mr-3 py-5 px-4 h-2 mb-2 w-full border border-dark-400 rounded-sm"
+              placeholder="Full Name"
+              // eslint-disable-next-line arrow-body-style
+              onChange={({target}) => setFullName(target.value)}
+              value={fullName}
+            />
+
             {/*  Email Field */}
             <input
               aria-label="Enter your Email"
@@ -75,7 +130,7 @@ const Login = () => {
               value={password}
             />
 
-            {/* LogIn Button */}
+            {/* SignUp Button */}
             <button
               type="submit"
               disabled={isInValid}
@@ -83,7 +138,7 @@ const Login = () => {
                 isInValid && ` opacity-50`
               }`}
             >
-              Log In
+              Sign Up
             </button>
           </form>
         </div>
@@ -91,12 +146,9 @@ const Login = () => {
         <div className="flex flex-col justify-center items-center mt-4 border border-black-400 px-6 py-4">
           <p className="text-sm font-normal">
             {' '}
-            Don&lsquo;t have an account?
-            <Link
-              to={ROUTES.SIGN_UP}
-              className="font-medium text-blue-400 pl-2"
-            >
-              Sign Up
+            Already have an account?
+            <Link to={ROUTES.LOGIN} className="font-medium text-blue-400 pl-2">
+              Login here
             </Link>
           </p>
         </div>
@@ -105,4 +157,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default SignUp;
